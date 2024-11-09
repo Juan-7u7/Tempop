@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Box, TextField, Button, Typography } from '@mui/material';
-import axios from 'axios'; // Asegúrate de instalar axios con `npm install axios`
-import { useNavigate } from 'react-router-dom'; // Importa useNavigate
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 function FormularioInicioSesion() {
   const [formData, setFormData] = React.useState({
@@ -9,8 +9,8 @@ function FormularioInicioSesion() {
     contraseña: ''
   });
 
-  const [error, setError] = React.useState(null); // Estado para manejar errores
-  const navigate = useNavigate(); // Hook de navegación
+  const [error, setError] = React.useState(null);
+  const navigate = useNavigate();
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -26,10 +26,11 @@ function FormularioInicioSesion() {
       const response = await axios.post('http://localhost:3001/login', formData);
       if (response.data.success) {
         alert('Inicio de sesión exitoso');
-
-        // Guarda el nombre de usuario en localStorage
+  
+        // Guarda el nombre de usuario y el userId en localStorage
         localStorage.setItem('username', formData.usuario);
-
+        localStorage.setItem('userId', response.data.user.id); // Almacena el ID del usuario en localStorage
+  
         navigate('/inicio'); // Redirige a la página "inicio"
       } else {
         setError('Credenciales incorrectas');
@@ -39,6 +40,7 @@ function FormularioInicioSesion() {
       setError('Hubo un error al iniciar sesión. Verifique la consola para más detalles.');
     }
   };
+  
 
   return (
     <Box
@@ -47,7 +49,7 @@ function FormularioInicioSesion() {
         display: 'flex',
         flexDirection: 'column',
         gap: 2,
-        width: { xs: '90%', sm: '80%', md: '40%' }, // Se adapta al tamaño de la pantalla
+        width: { xs: '90%', sm: '80%', md: '40%' },
         margin: 'auto',
         mt: 4,
         p: { xs: 2, sm: 3 },

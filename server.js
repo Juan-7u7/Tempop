@@ -2,13 +2,14 @@ const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer'); // Para manejar archivos binarios
 
 const app = express();
 const PORT = 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Aumenta el límite para permitir imágenes grandes en Base64
+app.use(express.json());
 
 // Configuración de la base de datos
 const dbConfig = {
@@ -21,20 +22,35 @@ const dbConfig = {
 // Pool de conexiones en lugar de una única conexión
 const pool = mysql.createPool(dbConfig);
 
-// Middleware para verificar el estado de la conexión
-app.use((req, res, next) => {
-  req.db = pool;
-  next();
+// Configuración de multer para recibir la imagen en formato binario
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+app.get('/get-user-id', (req, res) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return res.status(400).json({ message: 'Nombre de usuario requerido' });
+  }
+
+  const sql = 'SELECT id FROM usuarios WHERE usuario = ?';
+  pool.query(sql, [username], (err, results) => {
+    if (err) {
+      console.error('Error al obtener el ID del usuario:', err);
+      return res.status(500).json({ message: 'Error al obtener el ID del usuario' });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    res.json({ userId: results[0].id });
+  });
 });
 
-// Ruta para manejar la carga de la foto de perfil en formato Base64
-app.post('/upload-profile-picture', (req, res) => {
-  const { userId, profilePicture } = req.body;
 
-  // Agrega registros detallados
-  console.log("Datos recibidos:");
-  console.log("userId:", userId);
-  console.log("profilePicture (primeros 100 caracteres):", profilePicture ? profilePicture.slice(0, 100) : null);
+// Ruta para manejar la carga de la foto de perfil en formato binario
+app.post('/upload-profile-picture', upload.single('profilePicture'), (req, res) => {
+  const { userId } = req.body;
+  const profilePicture = req.file?.buffer;
 
   // Verifica que se hayan proporcionado el userId y la imagen
   if (!userId || !profilePicture) {
@@ -42,12 +58,12 @@ app.post('/upload-profile-picture', (req, res) => {
     return res.status(400).json({ message: 'ID de usuario y foto de perfil son requeridos' });
   }
 
-  // Consulta para actualizar la columna foto_perfil
+  // Consulta para actualizar la columna foto_perfil con el archivo binario
   const sql = 'UPDATE usuarios SET foto_perfil = ? WHERE id = ?';
 
   pool.query(sql, [profilePicture, userId], (err, result) => {
     if (err) {
-      console.error('Error al actualizar la foto de perfil en la base de datos:', err); // Registro detallado del error SQL
+      console.error('Error al actualizar la foto de perfil en la base de datos:', err);
       return res.status(500).json({ message: 'Error al actualizar la foto de perfil' });
     }
 
@@ -56,8 +72,6 @@ app.post('/upload-profile-picture', (req, res) => {
     });
   });
 });
-
-
 
 // Ruta para manejar el registro de usuarios
 app.post('/registro', (req, res) => {
@@ -104,11 +118,11 @@ app.post('/login', (req, res) => {
       res.json({ 
         success: true, 
         user: { 
-          id: result[0].id,
+          id: result[0].id,             // Asegúrate de incluir el ID
           usuario: result[0].usuario,
           nombre: result[0].nombre,
           tipo: result[0].tipo,
-          foto_perfil: result[0].foto_perfil // Retorna la imagen de perfil si existe
+          foto_perfil: result[0].foto_perfil // Retorna la imagen de perfil en binario si existe
         }
       });
     } else {
@@ -119,6 +133,38 @@ app.post('/login', (req, res) => {
     }
   });
 });
+
+app.get('/get-profile-picture', (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'ID de usuario requerido' });
+  }
+
+  const sql = 'SELECT foto_perfil FROM usuarios WHERE id = ?';
+  pool.query(sql, [userId], (err, results) => {
+    if (err) {
+      console.error('Error al obtener la foto de perfil:', err);
+      return res.status(500).json({ message: 'Error al obtener la foto de perfil' });
+    }
+    
+    // Verificar si hay resultados
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    
+    // Verificar si hay foto de perfil
+    if (!results[0].foto_perfil) {
+      return res.status(404).json({ message: 'No hay foto de perfil' });
+    }
+
+    // Enviar la imagen
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=3600'); // Cache de 1 hora
+    res.send(results[0].foto_perfil);
+  });
+});
+
 
 // Ruta para manejar el cierre de sesión
 app.post('/logout', (req, res) => {
