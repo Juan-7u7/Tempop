@@ -72,6 +72,27 @@ app.post('/upload-profile-picture', upload.single('profilePicture'), (req, res) 
     });
   });
 });
+// Ruta para manejar la actualización del perfil subir datos y asi
+app.post('/update-profile', upload.single('profilePicture'), (req, res) => {
+  const { userId, descripcion, habilidades, experiencia, contacto } = req.body;
+  const profilePicture = req.file?.buffer;
+
+  const sql = `
+  UPDATE usuarios 
+  SET foto_perfil = ?, descripcion = ?, habilidades = ?, experiencia = ?, contacto = ? 
+  WHERE id = ?
+`;
+
+
+  pool.query(sql, [profilePicture, descripcion, habilidades, experiencia, contacto, userId], (err, result) => {
+    if (err) {
+      console.error('Error al actualizar el perfil:', err);
+      return res.status(500).json({ message: 'Error al actualizar el perfil' });
+    }
+    res.status(200).json({ message: 'Perfil actualizado exitosamente' });
+  });
+});
+
 
 // Ruta para manejar el registro de usuarios
 app.post('/registro', (req, res) => {
@@ -196,3 +217,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
+
